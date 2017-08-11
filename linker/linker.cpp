@@ -1258,7 +1258,8 @@ static void reset_g_active_shim_libs(void) {
   }
 }
 
-static void parse_shim_libs(const char* path) {
+static void parse_LD_SHIM_LIBS(const char* path) {
+  g_ld_all_shim_libs.clear();
   if (path != nullptr) {
     // We have historically supported ':' as well as ' ' in LD_SHIM_LIBS.
     for (const auto& pair : android::base::Split(path, " :")) {
@@ -1270,14 +1271,6 @@ static void parse_shim_libs(const char* path) {
     }
   }
   reset_g_active_shim_libs();
-}
-
-static void parse_LD_SHIM_LIBS(const char* path) {
-  g_ld_all_shim_libs.clear();
-#ifdef FORCED_SHIM_LIBS
-  parse_shim_libs(FORCED_SHIM_LIBS);
-#endif
-  parse_shim_libs(path);
 }
 
 template<typename F>
@@ -2471,7 +2464,7 @@ void* do_dlopen(const char* name, int flags, const android_dlextinfo* extinfo,
 
   ProtectedDataGuard guard;
   reset_g_active_shim_libs();
-  soinfo* si = find_library(ns, translated_name, flags, extinfo, caller);
+  soinfo* si = find_library(ns, name, flags, extinfo, caller);
   if (si != nullptr) {
     si->call_constructors();
     return si->to_handle();
@@ -4334,7 +4327,7 @@ static ElfW(Addr) __linker_init_post_relocation(KernelArgumentBlock& args, ElfW(
   const char* ldpath_env = nullptr;
   const char* ldpreload_env = nullptr;
   const char* ldshim_libs_env = nullptr;
-  // if (!getauxval(AT_SECURE)) {
+
     ldpath_env = getenv("LD_LIBRARY_PATH");
     if (ldpath_env != nullptr) {
       INFO("[ LD_LIBRARY_PATH set to \"%s\" ]", ldpath_env);
@@ -4344,7 +4337,6 @@ static ElfW(Addr) __linker_init_post_relocation(KernelArgumentBlock& args, ElfW(
       INFO("[ LD_PRELOAD set to \"%s\" ]", ldpreload_env);
     }
     ldshim_libs_env = getenv("LD_SHIM_LIBS");
-  // }
 
   struct stat file_stat;
   // Stat "/proc/self/exe" instead of executable_path because
